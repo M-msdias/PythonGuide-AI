@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>⚡ Oráculo de Hogwarts | Chatbot RAG</title>
+  <style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: radial-gradient(ellipse at top, #0a0a1a 0%, #000000 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Efeito de estrelas */
+  body::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, #fff, rgba(0,0,0,0)),
+      radial-gradient(2px 2px at 40px 70px, #fff, rgba(0,0,0,0)),
+      radial-gradient(1px 1px at 90px 120px, #fff, rgba(0,0,0,0)),
+      radial-gradient(3px 3px at 130px 80px, #fff, rgba(0,0,0,0)),
+      radial-gradient(1px 1px at 160px 190px, #fff, rgba(0,0,0,0));
+    background-repeat: repeat;
+    background-size: 200px 200px;
+    opacity: 0.3;
+    pointer-events: none;
+    animation: stars 20s linear infinite;
+  }
+
+  @keyframes stars {
+    from { transform: translateY(0); }
+    to { transform: translateY(-200px); }
+  }
+
+  /* Varinha mágica decorativa */
+  body::after {
+    content: '⚡';
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    font-size: 40px;
+    opacity: 0.2;
+    animation: wandGlow 3s ease-in-out infinite;
+  }
+
+  @keyframes wandGlow {
+    0%, 100% { opacity: 0.2; text-shadow: 0 0 5px gold; }
+    50% { opacity: 0.5; text-shadow: 0 0 20px gold; }
+  }
+
+  .app {
+    width: 100%;
+    max-width: 1000px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+    background: rgba(10, 10, 26, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 30px;
+    border: 1px solid rgba(212, 175, 55, 0.3);
+    box-shadow: 0 0 50px rgba(212, 175, 55, 0.1);
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Efeito de pergaminho no fundo */
+  .app::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill="none" d="M20,20 L80,20 M20,40 L80,40 M20,60 L80,60 M20,80 L80,80" stroke="rgba(212,175,55,0.05)" stroke-width="1"/></svg>');
+    background-size: 30px 30px;
+    pointer-events: none;
+    opacity: 0.3;
+  }
+
+  .header {
+    text-align: center;
+    padding: 25px 20px;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+    position: relative;
+    background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(10,10,26,0.5) 100%);
+  }
+
+  .status-badge {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    background: rgba(0,0,0,0.5);
+    padding: 5px 12px;
+    border-radius: 20px;
+    border: 1px solid rgba(212,175,55,0.3);
+  }
+
+  .status-dot {
+    width: 8px;
+    height: 8px;
+    background: #4caf50;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+    box-shadow: 0 0 5px #4caf50;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.2); }
+  }
+
+  .header h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 1.8rem;
+    background: linear-gradient(135deg, #d4af37 0%, #f3e5ab 50%, #d4af37 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 30px rgba(212,175,55,0.5);
+    letter-spacing: 2px;
+  }
+
+  .header p {
+    font-size: 0.85rem;
+    color: #b8b8d0;
+    margin-top: 5px;
+  }
+
+  .header .subtitle {
+    font-family: 'Cinzel', serif;
+    font-size: 0.7rem;
+    color: #d4af37;
+    opacity: 0.7;
+    margin-top: 8px;
+  }
+
+  .chat-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    scroll-behavior: smooth;
+  }
+
+  .chat-container::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .chat-container::-webkit-scrollbar-track {
+    background: rgba(212, 175, 55, 0.1);
+    border-radius: 10px;
+  }
+
+  .chat-container::-webkit-scrollbar-thumb {
+    background: rgba(212, 175, 55, 0.5);
+    border-radius: 10px;
+  }
+
+  .message {
+    max-width: 80%;
+    padding: 12px 18px;
+    border-radius: 20px;
+    animation: fadeIn 0.4s ease;
+    line-height: 1.5;
+    font-size: 0.95rem;
+    position: relative;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(15px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .bot {
+    align-self: flex-start;
+    background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(30,20,50,0.9));
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    color: #e0e0ff;
+  }
+
+  .bot::before {
+    content: '🪄';
+    position: absolute;
+    left: -25px;
+    top: 10px;
+    font-size: 1rem;
+    opacity: 0.6;
+  }
+
+  .user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, #4b0082, #1e3a8a);
+    color: white;
+    box-shadow: 0 5px 15px rgba(75, 0, 130, 0.4);
+    border: 1px solid rgba(212, 175, 55, 0.2);
+  }
+
+  .user::after {
+    content: '👤';
+    position: absolute;
+    right: -25px;
+    top: 10px;
+    font-size: 1rem;
+    opacity: 0.6;
+  }
+
+  .avatar-bot, .avatar-user {
+    display: none;
+  }
+
+  .input-container {
+    display: flex;
+    padding: 20px;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.6);
+    border-top: 1px solid rgba(212, 175, 55, 0.3);
+  }
+
+  textarea {
+    flex: 1;
+    resize: none;
+    padding: 12px 16px;
+    border-radius: 15px;
+    border: 1px solid rgba(212, 175, 55, 0.4);
+    outline: none;
+    background: rgba(10, 10, 26, 0.9);
+    color: #e0e0ff;
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    transition: all 0.3s;
+  }
+
+  textarea:focus {
+    border-color: #d4af37;
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.3);
+  }
+
+  textarea::placeholder {
+    color: rgba(224, 224, 255, 0.4);
+  }
+
+  button {
+    background: linear-gradient(135deg, #41381c, #8a7a3a);
+    border: none;
+    padding: 0 24px;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    transition: all 0.3s;
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+    color: #d4af37;
+    font-weight: bold;
+  }
+
+  button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.6);
+    background: linear-gradient(135deg, #5a4e2a, #a08a4a);
+  }
+
+  button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .typing {
+    display: flex;
+    gap: 5px;
+    padding: 5px 0;
+  }
+
+  .typing span {
+    width: 8px;
+    height: 8px;
+    background: #d4af37;
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+    box-shadow: 0 0 5px gold;
+  }
+
+  .typing span:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  .typing span:nth-child(3) {
+    animation-delay: 0.4s;
+  }
+
+  @keyframes typing {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-12px); opacity: 1; }
+  }
+
+  .info-text {
+    text-align: center;
+    margin-top: 10px;
+    font-size: 0.7rem;
+    color: rgba(212, 175, 55, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .info-text span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  @media (max-width: 768px) {
+    .app {
+      height: 95vh;
+      margin: 0;
+    }
+    
+    .message {
+      max-width: 85%;
+      font-size: 0.85rem;
+    }
+    
+    .header h1 {
+      font-size: 1.3rem;
+    }
+    
+    .bot::before, .user::after {
+      display: none;
+    }
+    
+    button {
+      padding: 0 18px;
+    }
+  }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <h1>⚡ Oráculo de Hogwarts</h1>
+    <p>Consulte os conhecimentos do mundo bruxo</p>
+    <div class="subtitle">"A sabedoria está nos pergaminhos antigos"</div>
+  </header>
+
+  <main class="chat-container" id="chatMessages">
+    <div class="message bot">
+      🧙‍♂️ <strong>Bem-vindo ao Oráculo Mágico!</strong><br><br>
+      Sou um assistente treinado nos conhecimentos do mundo bruxo de <strong>Harry Potter</strong>.<br><br>
+      📚 <strong>Posso te ajudar com:</strong><br>
+      • Personagens (Harry, Hermione, Dumbledore, Snape...)<br>
+      • Casas de Hogwarts (Grifinória, Sonserina, Corvinal, Lufa-Lufa)<br>
+      • Feitiços e poções (Expecto Patronum, Avada Kedavra...)<br>
+      • Criaturas mágicas (Dragões, Hipogrifos, Dementadores...)<br>
+      • Livros e filmes da série<br>
+      • Objetos mágicos (Relíquias da Morte, Varinha das Varinhas...)<br><br>
+      💫 <strong>Faça sua pergunta sobre o mundo mágico!</strong>
+    </div>
+  </main>
+
+  <div class="input-container">
+    <textarea id="messageInput" placeholder="🔮 Pergunte algo ao mundo mágico..." rows="1"></textarea>
+    <button id="sendButton">🪄</button>
+  </div>
+</div>
+
+<script>
+const API_URL = window.location.origin + '/chat';
+let messageHistory = [];
+
+const chatMessages = document.getElementById('chatMessages');
+const messageInput = document.getElementById('messageInput');
+const sendButton = document.getElementById('sendButton');
+
+// Auto-resize textarea
+messageInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+});
+
+async function sendMessage() {
+    const message = messageInput.value.trim();
+    if (!message) return;
+    
+    messageInput.disabled = true;
+    sendButton.disabled = true;
+    
+    addMessage(message, 'user');
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
+    
+    const typingId = showTyping();
+    
+    try {
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: message,
+                history: messageHistory.slice(-10)
+            })
+        });
+        
+        if (!response.ok) throw new Error('Erro na API');
+        
+        const data = await response.json();
+        hideTyping(typingId);
+        addMessage(data.response, 'bot');
+        
+        messageHistory.push({role: 'user', content: message});
+        messageHistory.push({role: 'assistant', content: data.response});
+        
+        if (messageHistory.length > 20) messageHistory = messageHistory.slice(-20);
+        
+    } catch (error) {
+        
+        hideTyping(typingId);
+        addMessage('✨ Ops! A magia falhou por um instante. Tente novamente... ✨', 'bot');
+    } finally {
+        messageInput.disabled = false;
+        sendButton.disabled = false;
+        messageInput.focus();
+    }
+}
+
+function addMessage(text, sender) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${sender}`;
+    messageDiv.innerHTML = text.replace(/\n/g, '<br>');
+    chatMessages.appendChild(messageDiv);
+    scrollToBottom();
+}
+
+function showTyping() {
+    const id = 'typing-' + Date.now();
+    const typingDiv = document.createElement('div');
+    typingDiv.id = id;
+    typingDiv.className = 'message bot';
+    typingDiv.innerHTML = `
+        <div class="typing">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    `;
+    chatMessages.appendChild(typingDiv);
+    scrollToBottom();
+    return id;
+}
+
+function hideTyping(id) {
+    const element = document.getElementById(id);
+    if (element) element.remove();
+}
+
+function scrollToBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+sendButton.addEventListener('click', sendMessage);
+messageInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+    }
+});
+
+// Verificar saúde da API
+async function checkHealth() {
+    try {
+        const response = await fetch(window.location.origin + '/health');
+        if (response.ok) {
+            
+            const statusDot = document.querySelector('.status-dot');
+            if (statusDot) statusDot.style.background = '#4caf50';
+        }
+    } catch (error) {
+        
+        const statusDot = document.querySelector('.status-dot');
+        if (statusDot) statusDot.style.background = '#f44336';
+    }
+}
+
+checkHealth();
+setInterval(checkHealth, 30000);
+
+messageInput.focus();
+</script>
+</body>
+</html>
