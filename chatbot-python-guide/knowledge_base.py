@@ -13,6 +13,10 @@ Fluxo:
     fontes -> documentos -> chunks
 """
 
+import json
+from pathlib import Path
+CACHE_FILE = Path("data/python_docs_cache.json")
+
 from typing import List, Tuple
 from urllib.parse import urljoin
 
@@ -20,6 +24,11 @@ import requests
 from bs4 import BeautifulSoup
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+import json
+from pathlib import Path
+
+CACHE_FILE = Path("data/python_docs_cache.json")
 
 
 # CONFIGURAÇÃO
@@ -410,7 +419,77 @@ class PythonDocumentationScraper:
 
 
 # CONSTRUÇÃO DA BASE
+def salvar_cache(documentos: List[Document]) -> None:
+    """
+    Salva os documentos da base de conhecimento em JSON.
+    """
 
+    CACHE_FILE.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    dados = []
+
+    for documento in documentos:
+        dados.append(
+            {
+                "page_content": documento.page_content,
+                "metadata": documento.metadata,
+            }
+        )
+
+    with open(
+        CACHE_FILE,
+        "w",
+        encoding="utf-8",
+    ) as arquivo:
+        json.dump(
+            dados,
+            arquivo,
+            ensure_ascii=False,
+            indent=2,
+        )
+
+    print(
+        f"\n[CACHE] Base salva em: {CACHE_FILE}"
+    )
+
+
+def carregar_cache() -> List[Document]:
+    """
+    Carrega os documentos previamente salvos.
+    """
+
+    if not CACHE_FILE.exists():
+        return []
+
+    print(
+        f"\n[CACHE] Carregando base de: {CACHE_FILE}"
+    )
+
+    with open(
+        CACHE_FILE,
+        "r",
+        encoding="utf-8",
+    ) as arquivo:
+        dados = json.load(arquivo)
+
+    documentos = []
+
+    for item in dados:
+        documentos.append(
+            Document(
+                page_content=item["page_content"],
+                metadata=item.get("metadata", {}),
+            )
+        )
+
+    print(
+        f"[CACHE] {len(documentos)} documentos carregados."
+    )
+
+    return documentos
 
 def criar_base_conhecimento() -> Tuple[
     List[Document],
@@ -418,53 +497,84 @@ def criar_base_conhecimento() -> Tuple[
 ]:
     """
     Cria os documentos e chunks utilizados pelo RAG.
+
+    Se existir um cache local, ele será utilizado para evitar
+    uma nova coleta da documentação.
     """
 
     print("\nCriando base de conhecimento...")
 
-    all_texts = list(
-        TEXTOS_CONHECIMENTO_MANUAL
-    )
-
     # --------------------------------------------------------
-    # WEB SCRAPING
+    # CACHE
     # --------------------------------------------------------
 
-    try:
-        scraper = PythonDocumentationScraper()
+    documentos_cache = carregar_cache()
 
-        scraped_texts = scraper.scrape_all()
+    if documentos_cache:
+        documentos = documentos_cache
 
-        all_texts.extend(scraped_texts)
-
-    except Exception as error:
         print(
-            "[AVISO] O web scraping falhou."
-        )
-        print(
-            f"Motivo: {error}"
-        )
-        print(
-            "O sistema continuará utilizando "
-            "o conteúdo manual."
+            "[CACHE] Utilizando a base de conhecimento salva."
         )
 
-    # --------------------------------------------------------
-    # DOCUMENTOS
-    # --------------------------------------------------------
+    else:
+        # ----------------------------------------------------
+        # CONTEÚDO MANUAL
+        # ----------------------------------------------------
 
-    documentos = []
-
-    for index, texto in enumerate(all_texts):
-        documento = Document(
-            page_content=texto,
-            metadata={
-                "fonte": "python_documentation",
-                "document_id": index,
-            },
+        all_texts = list(
+            TEXTOS_CONHECIMENTO_MANUAL
         )
 
-        documentos.append(documento)
+        # ----------------------------------------------------
+        # WEB SCRAPING
+        # ----------------------------------------------------
+
+        try:
+            scraper = PythonDocumentationScraper()
+
+            scraped_texts = scraper.scrape_all()
+
+            all_texts.extend(
+                scraped_texts
+            )
+
+        except Exception as error:
+            print(
+                "[AVISO] O web scraping falhou."
+            )
+            print(
+                f"Motivo: {error}"
+            )
+            print(
+                "O sistema continuará utilizando "
+                "o conteúdo manual."
+            )
+
+        # ----------------------------------------------------
+        # DOCUMENTOS
+        # ----------------------------------------------------
+
+        documentos = []
+
+        for index, texto in enumerate(all_texts):
+            documento = Document(
+                page_content=texto,
+                metadata={
+                    "fonte": "python_documentation",
+                    "document_id": index,
+                },
+            )
+
+            documentos.append(
+                documento
+            )
+
+        # ----------------------------------------------------
+        # SALVAR CACHE
+        # ----------------------------------------------------
+
+        salvar_cache(documentos)
 
     # --------------------------------------------------------
     # CHUNKING

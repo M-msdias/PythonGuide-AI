@@ -1,15 +1,14 @@
 services:
-
   python-guide-ai:
-
     build: .
-
     container_name: python-guide-ai
-
-    ports:
-      - "8000:8000"
-
+    network_mode: host
     env_file:
       - .env
-
+    environment:
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+    volumes:
+      - ./data:/app/data
+      - ~/.cache/huggingface:/root/.cache/huggingface:ro
     restart: unless-stopped
