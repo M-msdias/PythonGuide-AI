@@ -560,39 +560,8 @@ relevantes sobre Python.
             "[LANGGRAPH] Chamando LLM externa..."
         )
 
-
-        evidence_status = (
-            "SIM"
-            if state["has_relevant_context"]
-            else "NAO"
-        )
-
-        prompt_value = (
-            self.prompt_template.invoke(
-                {
-                    "context": "\n\n".join(
-                        [
-                            doc.page_content
-                            for doc in state[
-                                "context"
-                            ]
-                        ]
-                    ),
-                    "history": self._format_history(
-                        state["history"]
-                    ),
-                    "question": state[
-                        "message"
-                    ],
-                    "evidence_status": (
-                        evidence_status
-                    ),
-                }
-            )
-        )
-
         result = self.llm.invoke(
-            prompt_value
+            state["prompt"]
         )
 
         state["response"] = (
