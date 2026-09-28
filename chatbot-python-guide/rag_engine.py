@@ -260,8 +260,50 @@ para fazê-lo.
 
         question = state["message"]
 
+        # Utiliza as mensagens anteriores para
+        # contextualizar a busca sem enviar uma nova
+        # solicitação à LLM.
+        history = state["history"]
+
+        history_lines = []
+
+        for message in history[-6:]:
+
+            role = message.get(
+                "role",
+                "user",
+            )
+
+            content = message.get(
+                "content",
+                "",
+            )
+
+            if role == "user":
+                role_name = "Usuário"
+            else:
+                role_name = "Assistente"
+
+            history_lines.append(
+                f"{role_name}: {content}"
+            )
+
+        history_text = "\n".join(
+            history_lines
+        )
+
+        if history_text:
+            retrieval_query = (
+                "Histórico da conversa:\n"
+                f"{history_text}\n\n"
+                "Pergunta atual:\n"
+                f"{question}"
+            )
+        else:
+            retrieval_query = question
+
         docs = self.retriever.invoke(
-            question
+            retrieval_query
         )
 
         state["context"] = docs
